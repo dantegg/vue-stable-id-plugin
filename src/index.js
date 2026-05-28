@@ -1,32 +1,29 @@
-const crypto = require('crypto');
+const { injectVueLoaderModules } = require('./adapters/webpack-vue2/inject-vue-loader-modules');
+const { normalizePluginOptions } = require('./core/options');
+
+const PLUGIN_NAME = 'VueStableIdPlugin';
+const VITE_PLUGIN_NAME = 'vite-vue-stable-id';
 
 class VueStableIdPlugin {
+  constructor(options = {}) {
+    this.options = normalizePluginOptions(options);
+  }
+
   apply(compiler) {
-    compiler.hooks.compilation.tap('VueStableIdPlugin', (compilation) => {
-      const vueLoader = compilation.options.module.rules.find(rule => rule.loader && rule.loader.includes('vue-loader'));
-      
-      if (vueLoader && vueLoader.options && vueLoader.options.compilerOptions) {
-        const originalModules = vueLoader.options.compilerOptions.modules || [];
-        vueLoader.options.compilerOptions.modules = [
-          {
-            preTransformNode(astEl) {
-              if (astEl.tag && !astEl.attrsMap.id) {
-                const hash = crypto.createHash('md5')
-                  .update(astEl.tag + JSON.stringify(astEl.attrsMap))
-                  .digest('hex');
-                
-                const id = `id-${hash}`;
-                astEl.attrsList.push({ name: 'id', value: id });
-                astEl.attrsMap.id = id;
-              }
-              return astEl;
-            }
-          },
-          ...originalModules
-        ];
-      }
+    injectVueLoaderModules({
+      compiler,
+      options: this.options,
+      pluginName: PLUGIN_NAME
     });
   }
 }
 
 module.exports = VueStableIdPlugin;
+module.exports.VueStableIdPlugin = VueStableIdPlugin;
+module.exports.createViteVueStableIdPlugin = function createViteVueStableIdPlugin(options = {}) {
+  const { createViteVueStableIdPlugin } = require('./adapters/vite-vue3');
+  return createViteVueStableIdPlugin({
+    ...options,
+    pluginName: VITE_PLUGIN_NAME
+  });
+};
